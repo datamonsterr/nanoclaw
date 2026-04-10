@@ -140,9 +140,9 @@ function buildVolumeMounts(
     }
   }
 
-  const env = (settings.env && typeof settings.env === 'object'
-    ? settings.env
-    : {}) as Record<string, string>;
+  const env = (
+    settings.env && typeof settings.env === 'object' ? settings.env : {}
+  ) as Record<string, string>;
   // Enable agent swarms (subagent orchestration)
   // https://code.claude.com/docs/en/agent-teams#orchestrate-teams-of-claude-code-sessions
   env.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS = '1';
@@ -155,9 +155,11 @@ function buildVolumeMounts(
   settings.env = env;
 
   // MCP servers — add when credentials are available, never remove user-added ones
-  const mcpServers = (settings.mcpServers && typeof settings.mcpServers === 'object'
-    ? settings.mcpServers
-    : {}) as Record<string, unknown>;
+  const mcpServers = (
+    settings.mcpServers && typeof settings.mcpServers === 'object'
+      ? settings.mcpServers
+      : {}
+  ) as Record<string, unknown>;
   const hasJira = !!(
     (jiraEnv.JIRA_BASE_URL ?? process.env.JIRA_BASE_URL) &&
     (jiraEnv.JIRA_EMAIL ?? process.env.JIRA_EMAIL) &&
@@ -189,8 +191,34 @@ function buildVolumeMounts(
     readonly: false,
   });
 
-  // Gmail credentials directory (for Gmail MCP inside the container)
+  // Git credentials: mount ~/.gitconfig and ~/.ssh so the agent can clone/push repos
   const homeDir = os.homedir();
+  const gitConfigFile = path.join(homeDir, '.gitconfig');
+  if (fs.existsSync(gitConfigFile)) {
+    mounts.push({
+      hostPath: gitConfigFile,
+      containerPath: '/home/node/.gitconfig',
+      readonly: true,
+    });
+  }
+  const gitConfigNuoa = path.join(homeDir, '.gitconfig-nuoa');
+  if (fs.existsSync(gitConfigNuoa)) {
+    mounts.push({
+      hostPath: gitConfigNuoa,
+      containerPath: '/home/node/.gitconfig-nuoa',
+      readonly: true,
+    });
+  }
+  const sshDir = path.join(homeDir, '.ssh');
+  if (fs.existsSync(sshDir)) {
+    mounts.push({
+      hostPath: sshDir,
+      containerPath: '/home/node/.ssh',
+      readonly: true,
+    });
+  }
+
+  // Gmail credentials directory (for Gmail MCP inside the container)
   const gmailDir = path.join(homeDir, '.gmail-mcp');
   if (fs.existsSync(gmailDir)) {
     mounts.push({
@@ -238,7 +266,9 @@ function buildVolumeMounts(
     'agent-runner-src',
   );
   if (fs.existsSync(agentRunnerSrc)) {
-    const srcFiles = fs.readdirSync(agentRunnerSrc).filter((f) => f.endsWith('.ts'));
+    const srcFiles = fs
+      .readdirSync(agentRunnerSrc)
+      .filter((f) => f.endsWith('.ts'));
     const needsCopy =
       !fs.existsSync(groupAgentRunnerDir) ||
       srcFiles.some((f) => {
