@@ -60,6 +60,8 @@ const IPC_INPUT_DIR = '/workspace/ipc/input';
 const IPC_INPUT_CLOSE_SENTINEL = path.join(IPC_INPUT_DIR, '_close');
 const IPC_POLL_MS = 500;
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
 /**
  * Push-based async iterable for streaming user messages to the SDK.
  * Keeps the iterable alive until end() is called, preventing isSingleUserTurn.
@@ -411,6 +413,8 @@ async function runQuery(
         'NotebookEdit',
         'mcp__nanoclaw__*',
         'mcp__gmail__*',
+        'mcp__gmail2__*',
+        'mcp__jira__*',
       ],
       env: sdkEnv,
       permissionMode: 'bypassPermissions',
@@ -429,6 +433,23 @@ async function runQuery(
         gmail: {
           command: 'npx',
           args: ['-y', '@gongrzhe/server-gmail-autoauth-mcp'],
+        },
+        gmail2: {
+          command: 'npx',
+          args: ['-y', '@gongrzhe/server-gmail-autoauth-mcp'],
+          env: {
+            GMAIL_CREDENTIALS_PATH: '/home/node/.gmail-mcp-2/credentials.json',
+            GMAIL_OAUTH_PATH: '/home/node/.gmail-mcp-2/client_secret.json',
+          },
+        },
+        jira: {
+          command: 'node',
+          args: [path.join(__dirname, 'jira-mcp.js')],
+          env: {
+            JIRA_BASE_URL: process.env.JIRA_BASE_URL ?? '',
+            JIRA_EMAIL: process.env.JIRA_EMAIL ?? '',
+            JIRA_API_TOKEN: process.env.JIRA_API_TOKEN ?? '',
+          },
         },
       },
       hooks: {
@@ -541,7 +562,6 @@ async function main(): Promise<void> {
   // No real secrets exist in the container environment.
   const sdkEnv: Record<string, string | undefined> = { ...process.env };
 
-  const __dirname = path.dirname(fileURLToPath(import.meta.url));
   const mcpServerPath = path.join(__dirname, 'ipc-mcp-stdio.js');
 
   let sessionId = containerInput.sessionId;

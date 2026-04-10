@@ -28,6 +28,9 @@ import {
 import { OneCLI } from '@onecli-sh/sdk';
 import { validateAdditionalMounts } from './mount-security.js';
 import { RegisteredGroup } from './types.js';
+import { readEnvFile } from './env.js';
+
+const jiraEnv = readEnvFile(['JIRA_BASE_URL', 'JIRA_EMAIL', 'JIRA_API_TOKEN']);
 
 const onecli = new OneCLI({ url: ONECLI_URL });
 
@@ -126,28 +129,48 @@ function buildVolumeMounts(
   );
   fs.mkdirSync(groupSessionsDir, { recursive: true });
   const settingsFile = path.join(groupSessionsDir, 'settings.json');
-  if (!fs.existsSync(settingsFile)) {
-    fs.writeFileSync(
-      settingsFile,
-      JSON.stringify(
-        {
-          env: {
-            // Enable agent swarms (subagent orchestration)
-            // https://code.claude.com/docs/en/agent-teams#orchestrate-teams-of-claude-code-sessions
-            CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS: '1',
-            // Load CLAUDE.md from additional mounted directories
-            // https://code.claude.com/docs/en/memory#load-memory-from-additional-directories
-            CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD: '1',
-            // Enable Claude's memory feature (persists user preferences between sessions)
-            // https://code.claude.com/docs/en/memory#manage-auto-memory
-            CLAUDE_CODE_DISABLE_AUTO_MEMORY: '0',
-          },
-        },
-        null,
-        2,
-      ) + '\n',
-    );
+  // Read existing settings or start fresh, then merge required fields.
+  // This ensures new integrations (e.g. MCP servers) are added to existing groups.
+  let settings: Record<string, unknown> = {};
+  if (fs.existsSync(settingsFile)) {
+    try {
+      settings = JSON.parse(fs.readFileSync(settingsFile, 'utf8'));
+    } catch {
+      settings = {};
+    }
   }
+
+  const env = (settings.env && typeof settings.env === 'object'
+    ? settings.env
+    : {}) as Record<string, string>;
+  // Enable agent swarms (subagent orchestration)
+  // https://code.claude.com/docs/en/agent-teams#orchestrate-teams-of-claude-code-sessions
+  env.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS = '1';
+  // Load CLAUDE.md from additional mounted directories
+  // https://code.claude.com/docs/en/memory#load-memory-from-additional-directories
+  env.CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD = '1';
+  // Enable Claude's memory feature (persists user preferences between sessions)
+  // https://code.claude.com/docs/en/memory#manage-auto-memory
+  env.CLAUDE_CODE_DISABLE_AUTO_MEMORY = '0';
+  settings.env = env;
+
+  // MCP servers — add when credentials are available, never remove user-added ones
+  const mcpServers = (settings.mcpServers && typeof settings.mcpServers === 'object'
+    ? settings.mcpServers
+    : {}) as Record<string, unknown>;
+  const hasJira = !!(
+    (jiraEnv.JIRA_BASE_URL ?? process.env.JIRA_BASE_URL) &&
+    (jiraEnv.JIRA_EMAIL ?? process.env.JIRA_EMAIL) &&
+    (jiraEnv.JIRA_API_TOKEN ?? process.env.JIRA_API_TOKEN)
+  );
+  if (hasJira) {
+    mcpServers.jira = { command: 'node', args: ['/tmp/dist/jira-mcp.js'] };
+  } else {
+    delete mcpServers.jira;
+  }
+  settings.mcpServers = mcpServers;
+
+  fs.writeFileSync(settingsFile, JSON.stringify(settings, null, 2) + '\n');
 
   // Sync skills from container/skills/ into each group's .claude/skills/
   const skillsSrc = path.join(process.cwd(), 'container', 'skills');
@@ -174,6 +197,16 @@ function buildVolumeMounts(
       hostPath: gmailDir,
       containerPath: '/home/node/.gmail-mcp',
       readonly: false, // MCP may need to refresh OAuth tokens
+    });
+  }
+
+  // Gmail 2nd account credentials directory
+  const gmail2Dir = path.join(homeDir, '.gmail-mcp-2');
+  if (fs.existsSync(gmail2Dir)) {
+    mounts.push({
+      hostPath: gmail2Dir,
+      containerPath: '/home/node/.gmail-mcp-2',
+      readonly: false,
     });
   }
 
@@ -205,13 +238,17 @@ function buildVolumeMounts(
     'agent-runner-src',
   );
   if (fs.existsSync(agentRunnerSrc)) {
-    const srcIndex = path.join(agentRunnerSrc, 'index.ts');
-    const cachedIndex = path.join(groupAgentRunnerDir, 'index.ts');
+    const srcFiles = fs.readdirSync(agentRunnerSrc).filter((f) => f.endsWith('.ts'));
     const needsCopy =
       !fs.existsSync(groupAgentRunnerDir) ||
-      !fs.existsSync(cachedIndex) ||
-      (fs.existsSync(srcIndex) &&
-        fs.statSync(srcIndex).mtimeMs > fs.statSync(cachedIndex).mtimeMs);
+      srcFiles.some((f) => {
+        const srcPath = path.join(agentRunnerSrc, f);
+        const dstPath = path.join(groupAgentRunnerDir, f);
+        return (
+          !fs.existsSync(dstPath) ||
+          fs.statSync(srcPath).mtimeMs > fs.statSync(dstPath).mtimeMs
+        );
+      });
     if (needsCopy) {
       fs.cpSync(agentRunnerSrc, groupAgentRunnerDir, { recursive: true });
     }
@@ -244,6 +281,15 @@ async function buildContainerArgs(
 
   // Pass host timezone so container's local time matches the user's
   args.push('-e', `TZ=${TIMEZONE}`);
+
+  // Tell Claude SDK to use MiniMax API endpoint
+  args.push('-e', `ANTHROPIC_BASE_URL=https://api.minimax.io/anthropic`);
+
+  // Pass Jira credentials when configured so the Jira MCP server can authenticate
+  for (const key of ['JIRA_BASE_URL', 'JIRA_EMAIL', 'JIRA_API_TOKEN']) {
+    const val = jiraEnv[key] ?? process.env[key];
+    if (val) args.push('-e', `${key}=${val}`);
+  }
 
   // OneCLI gateway handles credential injection — containers never see real secrets.
   // The gateway intercepts HTTPS traffic and injects API keys or OAuth tokens.

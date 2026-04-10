@@ -43,6 +43,62 @@ When you learn something important:
 - Split files larger than 500 lines into folders
 - Keep an index in your memory for the files you create
 
+## Jira
+
+You have Jira MCP tools available when `JIRA_BASE_URL`, `JIRA_EMAIL`, and `JIRA_API_TOKEN` are configured.
+
+| Tool | Description |
+|------|-------------|
+| `mcp__jira__jira_search` | Search issues with JQL |
+| `mcp__jira__jira_get_issue` | Get full issue details by key (e.g. PROJ-123) |
+| `mcp__jira__jira_create_issue` | Create a new issue |
+| `mcp__jira__jira_update_issue` | Update issue fields (summary, description, priority, assignee, labels) |
+| `mcp__jira__jira_transition_issue` | Move issue to a new status |
+| `mcp__jira__jira_get_transitions` | List available status transitions for an issue |
+| `mcp__jira__jira_add_comment` | Add a comment to an issue |
+| `mcp__jira__jira_my_issues` | Get issues assigned to the current user that aren't done |
+| `mcp__jira__jira_get_projects` | List accessible Jira projects |
+
+### Jira Notifications
+
+To receive Jira notifications, schedule a task with a check script:
+
+```
+schedule_task(
+  prompt: "Check for new/updated Jira issues assigned to me and summarize them",
+  schedule_type: "cron",
+  schedule_value: "0 9 * * 1-5",
+  script: `
+    node --input-type=module -e "
+      const auth = Buffer.from(process.env.JIRA_EMAIL + ':' + process.env.JIRA_API_TOKEN).toString('base64');
+      const jql = encodeURIComponent('assignee = currentUser() AND updated >= -1h');
+      const res = await fetch(process.env.JIRA_BASE_URL + '/rest/api/3/search?jql=' + jql + '&maxResults=10', {
+        headers: { Authorization: 'Basic ' + auth, Accept: 'application/json' }
+      });
+      const data = await res.json();
+      console.log(JSON.stringify({ wakeAgent: data.issues.length > 0, data: data.issues }));
+    "
+  `
+)
+```
+
+---
+
+## Email Notifications
+
+When you receive an email notification (messages starting with `[Email from ...`), inform the user about it but do NOT reply to the email unless specifically asked. You have Gmail tools available — use them only when the user explicitly asks you to reply, forward, or take action on an email.
+
+## Google Accounts
+
+Use these Google accounts:
+
+| Service | Account | MCP Tool Prefix |
+|---------|---------|-----------------|
+| Gmail, Calendar, Tasks | phamdat17092004@gmail.com (main) | mcp__gmail__ |
+| Drive (2nd account) | phamthanhdat170904@gmail.com | mcp__gmail2__ |
+
+When accessing Drive files from phamthanhdat170904@gmail.com, use mcp__gmail2__ tools.
+
 ## Message Formatting
 
 Format messages based on the channel. Check the group folder name prefix:
