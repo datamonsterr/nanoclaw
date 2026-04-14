@@ -1,0 +1,116 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "instructions": ["CLAUDE.md", "CONTRIBUTING.md"],
+  "permission": {
+    "bash": {
+      "*": "ask",
+      "git remote *": "allow",
+      "git *": "ask",
+      "npx tsx *": "allow",
+      "npm run *": "allow",
+      "npm install *": "allow",
+      "bash setup.sh *": "allow",
+      "bash setup.sh": "allow",
+      "curl -fsSL *": "allow",
+      "curl *": "ask",
+      "./container/build.sh": "allow",
+      "docker builder *": "allow",
+      "docker info *": "allow",
+      "docker *": "ask",
+      "systemctl --user daemon-reload": "allow",
+      "systemctl --user enable nanoclaw": "allow",
+      "systemctl --user start nanoclaw": "allow",
+      "systemctl --user status nanoclaw *": "allow",
+      "systemctl --user *": "ask",
+      "printenv *": "allow",
+      "echo *": "allow"
+    },
+    "read": {
+      "*": "allow",
+      "*.env": "deny",
+      "*.env.*": "deny",
+      "*.env.example": "allow"
+    },
+    "edit": "ask",
+    "skill": {
+      "*": "allow"
+    },
+    "external_directory": {
+      "~/projects/**": "allow"
+    }
+  },
+  "watcher": {
+    "ignore": [
+      "node_modules/**",
+      "dist/**",
+      ".git/**",
+      "logs/**",
+      "store/**",
+      "data/**"
+    ]
+  },
+  "agent": {
+    "build": {
+      "description": "Default agent for NanoClaw development with full tool access",
+      "mode": "primary",
+      "permission": {
+        "bash": {
+          "*": "ask",
+          "git *": "ask",
+          "npx tsx *": "allow",
+          "npm run *": "allow",
+          "npm install *": "allow",
+          "bash setup.sh *": "allow",
+          "bash setup.sh": "allow",
+          "curl -fsSL *": "allow",
+          "./container/build.sh": "allow",
+          "docker builder *": "allow",
+          "docker info *": "allow",
+          "echo *": "allow",
+          "printenv *": "allow"
+        }
+      }
+    },
+    "explore": {
+      "description": "Read-only agent for exploring the NanoClaw codebase",
+      "mode": "subagent",
+      "permission": {
+        "bash": {
+          "*": "ask",
+          "git diff *": "allow",
+          "git log *": "allow",
+          "git show *": "allow",
+          "grep *": "allow"
+        },
+        "edit": "deny"
+      }
+    }
+  },
+  "command": {
+    "setup": {
+      "template": "Run the NanoClaw setup skill to install dependencies, authenticate channels, and start services.",
+      "description": "Run NanoClaw setup",
+      "agent": "build"
+    },
+    "build": {
+      "template": "Build the NanoClaw project with npm run build and report any errors.",
+      "description": "Build the project",
+      "agent": "build"
+    },
+    "dev": {
+      "template": "Start the NanoClaw dev server with hot reload using npm run dev.",
+      "description": "Start dev server",
+      "agent": "build"
+    },
+    "debug": {
+      "template": "Run the NanoClaw debug skill to diagnose container, authentication, or service issues.",
+      "description": "Debug NanoClaw issues",
+      "agent": "build"
+    },
+    "container-rebuild": {
+      "template": "Force rebuild the agent container: docker builder prune -f && ./container/build.sh",
+      "description": "Rebuild agent container",
+      "agent": "build"
+    }
+  }
+}
