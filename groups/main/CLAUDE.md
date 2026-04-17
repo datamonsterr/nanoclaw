@@ -39,25 +39,47 @@ When working as a sub-agent or teammate, only use `send_message` if instructed t
 The `conversations/` folder contains searchable history of past conversations. Use this to recall context from previous sessions.
 
 When you learn something important:
+
 - Create files for structured data (e.g., `customers.md`, `preferences.md`)
 - Split files larger than 500 lines into folders
 - Keep an index in your memory for the files you create
+
+## Project Workspace
+
+Use `/workspace/extra/claw_projects` as the default writable workspace for creating new projects unless the user asks for a different location.
+
+- Create one subfolder per project under `/workspace/extra/claw_projects`
+- Store that project's files inside its own folder
+- Treat it as the preferred location for new repos, prototypes, and generated project content
+- `/workspace/extra/claw_projects` is already a live bind mount to host `~/claw_projects`
+- If it is empty, that means there are no projects there yet, not that the mount is missing
+- If the path exists and is writable, create the project folder directly instead of telling the user to configure mounts again
+
+## OpenCode
+
+When the OpenCode bridge is enabled, use `mcp__opencode__*` tools to inspect and work with the host OpenCode server and its sessions.
+
+- Start with `mcp__opencode__opencode_status` if you need to confirm connectivity
+- Use `mcp__opencode__opencode_list_sessions` to find sessions
+- Use `mcp__opencode__opencode_list_messages` or `mcp__opencode__opencode_get_message` to inspect session contents
+- Use `mcp__opencode__opencode_prompt`, `mcp__opencode__opencode_command`, or `mcp__opencode__opencode_shell` to interact with an existing OpenCode session
+- Do not tell the user that OpenCode sessions are inaccessible from the container if these tools are available
 
 ## Jira
 
 You have Jira MCP tools available when `JIRA_BASE_URL`, `JIRA_EMAIL`, and `JIRA_API_TOKEN` are configured.
 
-| Tool | Description |
-|------|-------------|
-| `mcp__jira__jira_search` | Search issues with JQL |
-| `mcp__jira__jira_get_issue` | Get full issue details by key (e.g. PROJ-123) |
-| `mcp__jira__jira_create_issue` | Create a new issue |
-| `mcp__jira__jira_update_issue` | Update issue fields (summary, description, priority, assignee, labels) |
-| `mcp__jira__jira_transition_issue` | Move issue to a new status |
-| `mcp__jira__jira_get_transitions` | List available status transitions for an issue |
-| `mcp__jira__jira_add_comment` | Add a comment to an issue |
-| `mcp__jira__jira_my_issues` | Get issues assigned to the current user that aren't done |
-| `mcp__jira__jira_get_projects` | List accessible Jira projects |
+| Tool                               | Description                                                            |
+| ---------------------------------- | ---------------------------------------------------------------------- |
+| `mcp__jira__jira_search`           | Search issues with JQL                                                 |
+| `mcp__jira__jira_get_issue`        | Get full issue details by key (e.g. PROJ-123)                          |
+| `mcp__jira__jira_create_issue`     | Create a new issue                                                     |
+| `mcp__jira__jira_update_issue`     | Update issue fields (summary, description, priority, assignee, labels) |
+| `mcp__jira__jira_transition_issue` | Move issue to a new status                                             |
+| `mcp__jira__jira_get_transitions`  | List available status transitions for an issue                         |
+| `mcp__jira__jira_add_comment`      | Add a comment to an issue                                              |
+| `mcp__jira__jira_my_issues`        | Get issues assigned to the current user that aren't done               |
+| `mcp__jira__jira_get_projects`     | List accessible Jira projects                                          |
 
 ### Jira Notifications
 
@@ -92,12 +114,12 @@ When you receive an email notification (messages starting with `[Email from ...`
 
 Use these Google accounts:
 
-| Service | Account | MCP Tool Prefix |
-|---------|---------|-----------------|
-| Gmail, Calendar, Tasks | phamdat17092004@gmail.com (main) | mcp__gmail__ |
-| Drive (2nd account) | phamthanhdat170904@gmail.com | mcp__gmail2__ |
+| Service                | Account                          | MCP Tool Prefix |
+| ---------------------- | -------------------------------- | --------------- |
+| Gmail, Calendar, Tasks | phamdat17092004@gmail.com (main) | mcp**gmail**    |
+| Drive (2nd account)    | phamthanhdat170904@gmail.com     | mcp**gmail2**   |
 
-When accessing Drive files from phamthanhdat170904@gmail.com, use mcp__gmail2__ tools.
+When accessing Drive files from phamthanhdat170904@gmail.com, use mcp**gmail2** tools.
 
 ## Message Formatting
 
@@ -106,6 +128,7 @@ Format messages based on the channel. Check the group folder name prefix:
 ### Slack channels (folder starts with `slack_`)
 
 Use Slack mrkdwn syntax. Run `/slack-formatting` for the full reference. Key rules:
+
 - `*bold*` (single asterisks)
 - `_italic_` (underscores)
 - `<https://url|link text>` for links (NOT `[text](url)`)
@@ -141,12 +164,14 @@ Anthropic credentials must be either an API key from console.anthropic.com (`ANT
 
 Main has read-only access to the project and read-write access to its group folder:
 
-| Container Path | Host Path | Access |
-|----------------|-----------|--------|
-| `/workspace/project` | Project root | read-only |
-| `/workspace/group` | `groups/main/` | read-write |
+| Container Path                   | Host Path         | Access     |
+| -------------------------------- | ----------------- | ---------- |
+| `/workspace/project`             | Project root      | read-only  |
+| `/workspace/group`               | `groups/main/`    | read-write |
+| `/workspace/extra/claw_projects` | `~/claw_projects` | read-write |
 
 Key paths inside the container:
+
 - `/workspace/project/store/messages.db` - SQLite database
 - `/workspace/project/store/messages.db` (registered_groups table) - Group config
 - `/workspace/project/groups/` - All group folders
@@ -211,6 +236,7 @@ Groups are registered in the SQLite `registered_groups` table:
 ```
 
 Fields:
+
 - **Key**: The chat JID (unique identifier — WhatsApp, Telegram, Slack, Discord, etc.)
 - **name**: Display name for the group
 - **folder**: Channel-prefixed folder name under `groups/` for this group's files and memory
@@ -234,6 +260,7 @@ Fields:
 5. Optionally create an initial `CLAUDE.md` for the group
 
 Folder naming convention — channel prefix with underscore separator:
+
 - WhatsApp "Family Chat" → `whatsapp_family-chat`
 - Telegram "Dev Team" → `telegram_dev-team`
 - Discord "General" → `discord_general`
@@ -293,6 +320,7 @@ If the user wants to set up an allowlist, edit `~/.config/nanoclaw/sender-allowl
 ```
 
 Notes:
+
 - Your own messages (`is_from_me`) explicitly bypass the allowlist in trigger checks. Bot messages are filtered out by the database query before trigger evaluation, so they never reach the allowlist.
 - If the config file doesn't exist or is invalid, all senders are allowed (fail-open)
 - The config file is on the host at `~/.config/nanoclaw/sender-allowlist.json`, not inside the container
@@ -319,6 +347,7 @@ You can read and write to `/workspace/project/groups/global/CLAUDE.md` for facts
 ## Scheduling for Other Groups
 
 When scheduling tasks for other groups, use the `target_group_jid` parameter with the group's JID from `registered_groups.json`:
+
 - `schedule_task(prompt: "...", schedule_type: "cron", schedule_value: "0 9 * * 1", target_group_jid: "120363336345536173@g.us")`
 
 The task will run in that group's context with access to their files and memory.

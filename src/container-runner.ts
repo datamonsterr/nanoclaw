@@ -31,6 +31,12 @@ import { RegisteredGroup } from './types.js';
 import { readEnvFile } from './env.js';
 
 const jiraEnv = readEnvFile(['JIRA_BASE_URL', 'JIRA_EMAIL', 'JIRA_API_TOKEN']);
+const opencodeEnv = readEnvFile([
+  'OPENCODE_MCP_ENABLED',
+  'OPENCODE_BASE_URL',
+  'OPENCODE_SERVER_USERNAME',
+  'OPENCODE_SERVER_PASSWORD',
+]);
 
 const onecli = new OneCLI({ url: ONECLI_URL });
 
@@ -318,6 +324,17 @@ async function buildContainerArgs(
   // Pass Jira credentials when configured so the Jira MCP server can authenticate
   for (const key of ['JIRA_BASE_URL', 'JIRA_EMAIL', 'JIRA_API_TOKEN']) {
     const val = jiraEnv[key] ?? process.env[key];
+    if (val) args.push('-e', `${key}=${val}`);
+  }
+
+  // Optional OpenCode bridge for calling a host opencode serve instance.
+  for (const key of [
+    'OPENCODE_MCP_ENABLED',
+    'OPENCODE_BASE_URL',
+    'OPENCODE_SERVER_USERNAME',
+    'OPENCODE_SERVER_PASSWORD',
+  ]) {
+    const val = opencodeEnv[key] ?? process.env[key];
     if (val) args.push('-e', `${key}=${val}`);
   }
 
